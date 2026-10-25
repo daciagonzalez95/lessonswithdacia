@@ -13,7 +13,7 @@ async function initHome(){
   try{config=await api('/api/config');$('#policy-list').innerHTML=config.policies.map(p=>`<li>${esc(p)}</li>`).join('');$('#lesson-types').innerHTML=config.lesson_types.map(t=>`<button type="button" class="lesson-choice" data-minutes="${t.minutes}"><strong>${t.minutes}-minute private</strong><span>${money(t.price_cents)}</span>${t.minutes===40?'<small>Best for learning two skills</small>':''}</button>`).join('')||'<p class="muted">Lesson prices are being set up. Please check back soon.</p>';
     if(!config.payments_ready)$('#setup-note').textContent='Online booking is being set up. Please check back soon.';
     $('#lesson-types').onclick=e=>{const b=e.target.closest('[data-minutes]');if(!b)return;selectedMinutes=Number(b.dataset.minutes);document.querySelectorAll('.lesson-choice').forEach(x=>x.classList.toggle('selected',x===b));updateForm();};
-    const agree=$('#checkout-form').elements.agree;const pay=$('#checkout-form').querySelector('button[type=submit]');pay.disabled=true;agree.onchange=()=>{pay.disabled=!agree.checked;};
+    const agree=$('#checkout-form').elements.agree;const pay=$('#checkout-form').querySelector('button[type=submit]');pay.disabled=true;agree.onchange=()=>{pay.disabled=!agree.checked||!config.payments_ready;};
     const date=$('#lesson-date');const today=new Date();date.min=inputDate(today);const max=new Date(Date.now()+90*86400000);date.max=inputDate(max);date.value=date.min;date.onchange=loadSlots;await loadSlots();
   }catch(e){message('#booking-message',e.message);}
 }

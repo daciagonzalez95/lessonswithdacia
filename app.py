@@ -181,7 +181,7 @@ class Handler(BaseHTTPRequestHandler):
                 with db() as c:
                     types = [dict(r) for r in c.execute("SELECT id,minutes,price_cents FROM lesson_types WHERE active=1 AND price_cents>0 ORDER BY minutes")]
                     policy_version, policies = current_policy(c)
-                return self.reply(200, {"lesson_types": types, "policies": policies, "policy_version": policy_version, "timezone": TZ.key, "contact_email": os.environ.get("CONTACT_EMAIL", ""), "payments_ready": bool(os.environ.get("STRIPE_SECRET_KEY") and os.environ.get("MANAGE_LINK_SECRET"))})
+                return self.reply(200, {"lesson_types": types, "policies": policies, "policy_version": policy_version, "timezone": TZ.key, "contact_email": os.environ.get("CONTACT_EMAIL", ""), "payments_ready": bool(os.environ.get("STRIPE_SECRET_KEY") and os.environ.get("STRIPE_WEBHOOK_SECRET") and os.environ.get("PUBLIC_BASE_URL") and os.environ.get("MANAGE_LINK_SECRET"))})
             if path.path == "/api/slots":
                 day = datetime.strptime(q.get("date", [""])[0], "%Y-%m-%d").date()
                 today = utc_now().astimezone(TZ).date()
