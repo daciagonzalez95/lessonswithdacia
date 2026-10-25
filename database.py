@@ -32,7 +32,7 @@ class Result:
 
 
 def normalize_database_url(url):
-    """Remove the brackets left around a substituted Supabase password."""
+    """Remove placeholder punctuation left around a Supabase password."""
     if not url.startswith(("postgres://", "postgresql://")) or "@" not in url:
         return url
     prefix, host_and_path = url.rsplit("@", 1)
@@ -40,6 +40,8 @@ def normalize_database_url(url):
         return url
     user_prefix, password = prefix.rsplit(":", 1)
     if password.startswith("[") and password.endswith("]"):
+        return user_prefix + ":" + password[1:-1] + "@" + host_and_path
+    if password.startswith("'") and password.endswith("'"):
         return user_prefix + ":" + password[1:-1] + "@" + host_and_path
     return url
 
