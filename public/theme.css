@@ -1,0 +1,61 @@
+/* Pantone 13-4320 TSX Polar Wind, approximated for screens as #97CBEB. */
+:root { color: #41272d; background: #f7fbfd; }
+.site-header { background: #f7fbfd; color: #551c25; }
+.brand-mark { background: #551c25; color: #fff; }
+.brand small, .site-header nav { color: #70454c; }
+.site-header nav a:hover, .back:hover { color: #551c25; text-decoration: underline; }
+.eyebrow, .three-points span { color: #712f3a; }
+.hero {
+  min-height: calc(100svh - 184px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #97cbeb;
+  color: #551c25;
+  text-align: center;
+}
+.hero-copy {
+  width: 100%;
+  max-width: 920px;
+  padding: 80px 28px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.hero h1 { font-size: clamp(44px, 6.4vw, 86px); margin-bottom: 28px; }
+.hero h1 em { color: #551c25; }
+.hero-copy > p:not(.eyebrow) { color: #563a41; margin-bottom: 36px; }
+.button.primary { background: #551c25; color: #fff; }
+.button:disabled { opacity: .52; cursor: not-allowed; filter: none; }
+.intro { padding-top: 78px; padding-bottom: 78px; }
+.booking-section { background: #eaf5fb; }
+.section-head > p, .intro > p, .three-points p, .booking-item p { color: #675960; }
+.card { border-color: #d7e8ef; }
+.step { background: #dceef8; color: #551c25; }
+.card label, .summary { color: #551c25; }
+.card input:not([type=checkbox]), .card textarea, .card select, .compact input, .compact select { border-color: #bfd6e3; color: #41272d; outline-color: #551c25; }
+.slot, .lesson-choice { border-color: #bfd6e3; color: #551c25; }
+.slot:hover, .slot.selected, .lesson-choice:hover, .lesson-choice.selected { border-color: #551c25; background: #f8edf0; }
+.lesson-choice small { display: block; color: #70454c; font-size: 12px; font-weight: 600; margin-top: 8px; line-height: 1.3; }
+.lesson-choice:disabled { opacity: .45; cursor: not-allowed; }
+.policy-box { background: #f1f8fc; border: 1px solid #c5dce8; }
+.policy-box .fine { margin-top: -4px; }
+.policy-box.standalone { margin-top: 28px; padding: 26px 30px; scroll-margin-top: 24px; }
+.policy-box.standalone h3 { margin: 0 0 8px; font: 700 21px Manrope, sans-serif; }
+.policy-box.standalone p { margin: 0 0 16px; color: #675960; line-height: 1.6; }
+.policy-box.standalone ul { margin: 0; padding-left: 21px; line-height: 1.65; }
+.policy-box.standalone li + li { margin-top: 8px; }
+.check { padding: 14px; border: 1px solid #c5dce8; border-radius: 8px; background: #fff; }
+.check a { text-decoration: underline; text-underline-offset: 2px; }
+.check:has(input:checked) { border-color: #551c25; background: #fbf2f4; }
+.admin-grid button:not(.button), .manage-actions button { border-color: #bb9fa5; background: #fbf2f4; color: #551c25; }
+footer { background: #551c25; }
+footer .brand-mark { background: #97cbeb; color: #551c25; }
+footer .brand small, footer p, footer a { color: #f1dce0; }
+@media (max-width: 600px) {
+  .hero { min-height: calc(100svh - 180px); }
+  .hero-copy { padding: 74px 22px; }
+  .hero h1 { font-size: clamp(41px, 11vw, 58px); }
+  .site-header nav a:first-child { display: inline; }
+  .site-header nav a:nth-child(2) { display: none; }
+}
