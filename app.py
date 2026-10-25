@@ -226,8 +226,13 @@ class Handler(BaseHTTPRequestHandler):
             data = self.json_body()
             if path == "/api/checkout": return self.checkout(data)
             if path == "/api/admin/login":
+                email = os.environ.get("ADMIN_EMAIL", "").strip().casefold()
                 password = os.environ.get("ADMIN_PASSWORD", "")
-                if not password or not hmac.compare_digest(str(data.get("password", "")), password): return self.reply(401, {"error": "Invalid password"})
+                if not email or not password: return self.reply(503, {"error": "Coach login is not configured yet"})
+                supplied_email = str(data.get("email", "")).strip().casefold()
+                supplied_password = str(data.get("password", ""))
+                if not (hmac.compare_digest(supplied_email, email) and hmac.compare_digest(supplied_password, password)):
+                    return self.reply(401, {"error": "Invalid email or password"})
                 expiry = str(int(time.time() + 8 * 3600)); sig = hmac.new(password.encode(), expiry.encode(), hashlib.sha256).hexdigest()
                 return self.reply(200, {"ok": True}, {"Set-Cookie": f"admin_session={expiry}.{sig}; HttpOnly; SameSite=Strict; Path=/; Max-Age=28800" + ("; Secure" if os.environ.get("PUBLIC_BASE_URL", "").startswith("https:") else "")})
             if path.startswith("/api/admin/"):

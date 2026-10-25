@@ -4,7 +4,7 @@ A mobile booking app for private gymnastics lessons. Parents book without an acc
 
 ## Local preview
 
-Requires Python 3.10 or newer. Run `python3 app.py`, then open `http://127.0.0.1:8000`. The local server creates `bookings.sqlite3` automatically. Set `ADMIN_PASSWORD` and `MANAGE_LINK_SECRET` in your shell to use the admin and booking management flows. Online payments also require the Stripe variables in `.env.example` and a public webhook endpoint.
+Requires Python 3.10 or newer. Run `python3 app.py`, then open `http://127.0.0.1:8000`. The local server creates `bookings.sqlite3` automatically. Set `ADMIN_EMAIL`, `ADMIN_PASSWORD`, and `MANAGE_LINK_SECRET` in your shell to use the admin and booking management flows. Online payments also require the Stripe variables in `.env.example` and a public webhook endpoint.
 
 The 30-minute lesson starts at $40. The 40-minute lesson starts at $53 and is described as best for learning two skills. Prices, buffer time, availability, blocked times, and policies can be changed in the dashboard.
 
@@ -24,6 +24,7 @@ The 30-minute lesson starts at $40. The 40-minute lesson starts at $53 and is de
 | `DATABASE_URL` | Supabase Transaction pooler URI; include `sslmode=require`. |
 | `BUSINESS_TIMEZONE` | Usually `America/Los_Angeles`. |
 | `PUBLIC_BASE_URL` | Final HTTPS site origin. |
+| `ADMIN_EMAIL` | Email address for coach login. |
 | `ADMIN_PASSWORD` | Long unique coach login password. |
 | `MANAGE_LINK_SECRET` | Separate long random string used for secure parent links. Keep stable across deployments. |
 | `STRIPE_SECRET_KEY` | Stripe secret API key. |

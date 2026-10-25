@@ -15,6 +15,7 @@ class BookingFlowTest(unittest.TestCase):
         self.environment = patch.dict(os.environ, {
             "DATABASE_PATH": self.directory.name + "/bookings.sqlite3",
             "ADMIN_PASSWORD": "test-admin-password",
+            "ADMIN_EMAIL": "coach@example.com",
             "MANAGE_LINK_SECRET": "test-manage-secret",
             "STRIPE_SECRET_KEY": "sk_test_placeholder",
             "STRIPE_WEBHOOK_SECRET": "whsec_test_placeholder",
@@ -38,7 +39,8 @@ class BookingFlowTest(unittest.TestCase):
         config = self.client.get("/api/config").json
         self.assertEqual([(t["minutes"], t["price_cents"]) for t in config["lesson_types"]], [(30, 4000), (40, 5300)])
 
-        login = self.client.post("/api/admin/login", json={"password": "test-admin-password"})
+        self.assertEqual(self.client.post("/api/admin/login", json={"email": "wrong@example.com", "password": "test-admin-password"}).status_code, 401)
+        login = self.client.post("/api/admin/login", json={"email": "coach@example.com", "password": "test-admin-password"})
         self.assertEqual(login.status_code, 200)
         local_day = datetime.now(ZoneInfo("America/Los_Angeles")).date() + timedelta(days=4)
         day = local_day.isoformat()
