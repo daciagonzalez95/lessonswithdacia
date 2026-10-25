@@ -1,6 +1,8 @@
 /* Pantone 13-4320 TSX Polar Wind, approximated for screens as #97CBEB. */
 :root { color: #41272d; background: #f7fbfd; }
 .site-header { background: #f7fbfd; color: #551c25; }
+.site-header { height: 104px; }
+.logo-brand img { display: block; width: auto; height: 94px; object-fit: contain; }
 .brand-mark { background: #551c25; color: #fff; }
 .brand small, .site-header nav { color: #70454c; }
 .site-header nav a:hover, .back:hover { color: #551c25; text-decoration: underline; }
@@ -50,9 +52,13 @@
 .check:has(input:checked) { border-color: #551c25; background: #fbf2f4; }
 .admin-grid button:not(.button), .manage-actions button { border-color: #bb9fa5; background: #fbf2f4; color: #551c25; }
 footer { background: #551c25; }
+footer .logo-brand { background: #f7fbfd; border-radius: 8px; padding: 3px 12px; }
+footer .logo-brand img { height: 76px; }
 footer .brand-mark { background: #97cbeb; color: #551c25; }
 footer .brand small, footer p, footer a { color: #f1dce0; }
 @media (max-width: 600px) {
+  .site-header { height: 76px; }
+  .site-header .logo-brand img { height: 68px; }
   .hero { min-height: calc(100svh - 180px); }
   .hero-copy { padding: 74px 22px; }
   .hero h1 { font-size: clamp(41px, 11vw, 58px); }
