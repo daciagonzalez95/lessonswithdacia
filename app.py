@@ -4,6 +4,7 @@ import hmac
 import io
 import json
 import os
+import re
 import secrets
 import smtplib
 import sqlite3
@@ -81,6 +82,17 @@ def manage_token(booking_id):
     secret = os.environ.get("MANAGE_LINK_SECRET")
     if not secret: raise ValueError("Manage link secret is not configured")
     return hmac.new(secret.encode(), booking_id.encode(), hashlib.sha256).hexdigest()
+
+
+def payment_method():
+    return os.environ.get("PAYMENT_METHOD", "stripe").strip().lower()
+
+
+def venmo_url():
+    username = os.environ.get("VENMO_USERNAME", "").strip().lstrip("@")
+    if not re.fullmatch(r"[A-Za-z0-9_-]{3,64}", username):
+        return ""
+    return "https://venmo.com/u/" + username
 
 
 def overlap(a, b, c, d):
@@ -181,7 +193,9 @@ class Handler(BaseHTTPRequestHandler):
                 with db() as c:
                     types = [dict(r) for r in c.execute("SELECT id,minutes,price_cents FROM lesson_types WHERE active=1 AND price_cents>0 ORDER BY minutes")]
                     policy_version, policies = current_policy(c)
-                return self.reply(200, {"lesson_types": types, "policies": policies, "policy_version": policy_version, "timezone": TZ.key, "contact_email": os.environ.get("CONTACT_EMAIL", ""), "payments_ready": bool(os.environ.get("STRIPE_SECRET_KEY") and os.environ.get("STRIPE_WEBHOOK_SECRET") and os.environ.get("PUBLIC_BASE_URL") and os.environ.get("MANAGE_LINK_SECRET"))})
+                method = payment_method()
+                ready = bool(os.environ.get("MANAGE_LINK_SECRET") and (venmo_url() if method == "venmo" else (os.environ.get("STRIPE_SECRET_KEY") and os.environ.get("STRIPE_WEBHOOK_SECRET") and os.environ.get("PUBLIC_BASE_URL")) if method == "stripe" else False))
+                return self.reply(200, {"lesson_types": types, "policies": policies, "policy_version": policy_version, "timezone": TZ.key, "contact_email": os.environ.get("CONTACT_EMAIL", ""), "payment_method": method, "venmo_url": venmo_url() if method == "venmo" else "", "payments_ready": ready})
             if path.path == "/api/slots":
                 day = datetime.strptime(q.get("date", [""])[0], "%Y-%m-%d").date()
                 today = utc_now().astimezone(TZ).date()
@@ -199,14 +213,17 @@ class Handler(BaseHTTPRequestHandler):
             if path.path == "/api/manage":
                 token = q.get("token", [""])[0]
                 with db() as c:
-                    r = c.execute("SELECT b.id,b.start_at,b.end_at,b.status,b.notes,g.name gymnast,p.name parent,l.minutes,pm.amount_cents price_cents FROM bookings b JOIN gymnasts g ON g.id=b.gymnast_id JOIN parents p ON p.id=b.parent_id JOIN lesson_types l ON l.id=b.lesson_type_id JOIN payments pm ON pm.booking_id=b.id WHERE b.manage_token_hash=?", (hashlib.sha256(token.encode()).hexdigest(),)).fetchone()
+                    r = c.execute("SELECT b.id,b.start_at,b.end_at,b.status,b.notes,b.stripe_session_id,g.name gymnast,p.name parent,l.minutes,pm.amount_cents price_cents FROM bookings b JOIN gymnasts g ON g.id=b.gymnast_id JOIN parents p ON p.id=b.parent_id JOIN lesson_types l ON l.id=b.lesson_type_id JOIN payments pm ON pm.booking_id=b.id WHERE b.manage_token_hash=?", (hashlib.sha256(token.encode()).hexdigest(),)).fetchone()
                 if not r: return self.reply(404, {"error": "Booking not found"})
                 data = dict(r); data["can_change"] = r["status"] == "confirmed" and parse_dt(r["start_at"]) > utc_now() + timedelta(hours=12)
+                data["payment_method"] = "stripe" if r["stripe_session_id"] else "venmo"
+                data["venmo_url"] = venmo_url() if data["payment_method"] == "venmo" and r["status"] == "pending" else ""
+                data.pop("stripe_session_id", None)
                 return self.reply(200, data)
             if path.path == "/api/admin":
                 if not self.admin(): return self.reply(401, {"error": "Sign in required"})
                 with db() as c:
-                    bookings = [dict(r) for r in c.execute("SELECT b.id,b.start_at,b.end_at,b.status,b.notes,p.name parent,p.email,g.name gymnast,l.minutes,pm.amount_cents price_cents,pm.status payment_status FROM bookings b JOIN parents p ON p.id=b.parent_id JOIN gymnasts g ON g.id=b.gymnast_id JOIN lesson_types l ON l.id=b.lesson_type_id LEFT JOIN payments pm ON pm.booking_id=b.id ORDER BY b.start_at DESC LIMIT 500")]
+                    bookings = [dict(r) for r in c.execute("SELECT b.id,b.start_at,b.end_at,b.status,b.stripe_session_id,b.notes,p.name parent,p.email,g.name gymnast,l.minutes,pm.amount_cents price_cents,pm.status payment_status FROM bookings b JOIN parents p ON p.id=b.parent_id JOIN gymnasts g ON g.id=b.gymnast_id JOIN lesson_types l ON l.id=b.lesson_type_id LEFT JOIN payments pm ON pm.booking_id=b.id ORDER BY b.start_at DESC LIMIT 500")]
                     revenue = c.execute("SELECT COALESCE(SUM(amount_cents),0) FROM payments WHERE status='paid'").fetchone()[0]
                     data = {"bookings": bookings, "revenue_cents": revenue, "lesson_types": [dict(r) for r in c.execute("SELECT * FROM lesson_types")], "availability": [dict(r) for r in c.execute("SELECT * FROM availability")], "blocked": [dict(r) for r in c.execute("SELECT * FROM blocked_times")], "settings": settings(c), "policies": current_policy(c)[1]}
                 return self.reply(200, data)
@@ -243,8 +260,15 @@ class Handler(BaseHTTPRequestHandler):
         except (ValueError, KeyError, sqlite3.Error) as e: return self.reply(400, {"error": str(e)})
 
     def checkout(self, d):
-        if not os.environ.get("STRIPE_SECRET_KEY") or not os.environ.get("STRIPE_WEBHOOK_SECRET") or not os.environ.get("PUBLIC_BASE_URL"):
-            raise ValueError("Online booking is being set up. Please check back soon")
+        method = payment_method()
+        if method == "venmo":
+            if not venmo_url() or not os.environ.get("MANAGE_LINK_SECRET"):
+                raise ValueError("Venmo booking is being set up. Please check back soon")
+        elif method == "stripe":
+            if not os.environ.get("STRIPE_SECRET_KEY") or not os.environ.get("STRIPE_WEBHOOK_SECRET") or not os.environ.get("PUBLIC_BASE_URL") or not os.environ.get("MANAGE_LINK_SECRET"):
+                raise ValueError("Online booking is being set up. Please check back soon")
+        else:
+            raise ValueError("Payment method is not configured")
         if d.get("agree") is not True: raise ValueError("Please agree to the lesson policies")
         names = [str(d.get(k, "")).strip() for k in ("parent", "gymnast", "email", "phone")]
         if any(not x or len(x) > 120 for x in names) or "@" not in names[2]: raise ValueError("Enter valid contact details")
@@ -259,10 +283,12 @@ class Handler(BaseHTTPRequestHandler):
             booking_id = secrets.token_urlsafe(18); token = manage_token(booking_id)
             policy_version, _ = current_policy(c)
             if d.get("policy_version") != policy_version: raise ValueError("Policies changed. Refresh and review them before booking")
-            c.execute("INSERT INTO bookings VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)", (booking_id, parent, gymnast, lesson["id"], iso(start), iso(start + timedelta(minutes=minutes)), "pending", notes, policy_version, iso(utc_now()), hashlib.sha256(token.encode()).hexdigest(), iso(utc_now() + timedelta(minutes=45)), None, iso(utc_now())))
+            c.execute("INSERT INTO bookings VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)", (booking_id, parent, gymnast, lesson["id"], iso(start), iso(start + timedelta(minutes=minutes)), "pending", notes, policy_version, iso(utc_now()), hashlib.sha256(token.encode()).hexdigest(), iso(utc_now() + timedelta(minutes=45)) if method == "stripe" else None, None, iso(utc_now())))
             c.execute("INSERT INTO payments(booking_id,amount_cents,status) VALUES(?,?,?)", (booking_id, lesson["price_cents"], "pending"))
             c.commit()
         base = os.environ.get("PUBLIC_BASE_URL", f"http://{self.headers.get('Host','localhost:8000')}").rstrip("/")
+        if method == "venmo":
+            return self.reply(200, {"manage_url": base + "/manage?token=" + token, "venmo_url": venmo_url(), "reference": booking_id, "amount_cents": lesson["price_cents"], "status": "pending"})
         try:
             session = stripe_post("checkout/sessions", {"mode": "payment", "customer_email": names[2], "line_items[0][price_data][currency]": "usd", "line_items[0][price_data][unit_amount]": str(lesson["price_cents"]), "line_items[0][price_data][product_data][name]": f"{minutes}-minute private gymnastics lesson", "line_items[0][quantity]": "1", "success_url": base + "/success?booking=" + booking_id + "&token=" + token, "cancel_url": base + "/book?cancelled=1", "client_reference_id": booking_id, "metadata[booking_id]": booking_id, "expires_at": str(int(time.time() + 1800))})
         except Exception:
@@ -350,7 +376,16 @@ class Handler(BaseHTTPRequestHandler):
             elif path == "/api/admin/booking":
                 b = c.execute("SELECT b.*,l.minutes FROM bookings b JOIN lesson_types l ON l.id=b.lesson_type_id WHERE b.id=?", (d["id"],)).fetchone()
                 if not b: raise ValueError("Booking not found")
-                if d["action"] == "cancel": c.execute("UPDATE bookings SET status='cancelled' WHERE id=?", (b["id"],))
+                if d["action"] == "confirm_payment":
+                    if b["status"] != "pending" or b["stripe_session_id"]:
+                        raise ValueError("Only pending Venmo requests can be confirmed here")
+                    conflict = c.execute("SELECT 1 FROM bookings WHERE id<>? AND status='confirmed' AND start_at<? AND end_at>? LIMIT 1", (b["id"], b["end_at"], b["start_at"])).fetchone()
+                    if conflict: raise ValueError("Another confirmed lesson overlaps this time")
+                    c.execute("UPDATE bookings SET status='confirmed',hold_expires_at=NULL WHERE id=?", (b["id"],))
+                    c.execute("UPDATE payments SET status='paid' WHERE booking_id=?", (b["id"],))
+                elif d["action"] == "cancel":
+                    c.execute("UPDATE bookings SET status='cancelled' WHERE id=?", (b["id"],))
+                    if b["status"] == "pending": c.execute("UPDATE payments SET status='cancelled' WHERE booking_id=?", (b["id"],))
                 elif d["action"] == "reschedule":
                     start = parse_dt(d["start_at"])
                     if not available(c, start, b["minutes"], b["id"]): raise ValueError("Time unavailable")
@@ -362,6 +397,9 @@ class Handler(BaseHTTPRequestHandler):
                 c.execute(f"DELETE FROM {table} WHERE id=?", (int(d["id"]),))
             else: return self.reply(404, {"error": "Not found"})
             c.commit()
+            if path == "/api/admin/booking" and d["action"] == "confirm_payment":
+                try: send_confirmation(c, b["id"], manage_token(b["id"]))
+                except Exception as error: print("Confirmation email failed:", error)
         return self.reply(200, {"ok": True})
 
 
