@@ -14,7 +14,7 @@ The 30-minute lesson starts at $40. The 40-minute lesson starts at $53 and is de
 2. In Supabase **Connect**, copy the **Transaction pooler** URI (port 6543). Use that complete URI as Vercel's `DATABASE_URL` environment variable. Keep it server-side. The app uses SSL and disables prepared statements for the transaction pooler.
 3. Publish this folder to a private GitHub repository using GitHub Desktop. `.gitignore` excludes the local database, `.env`, and virtual environment.
 4. In Vercel, import that GitHub repository. Use the repository root and the **Flask** framework preset. The `app.py` Flask entry point and `requirements.txt` are ready for Vercel. Add the environment variables listed below to **Production** before enabling bookings. Set `PUBLIC_BASE_URL` to your final `https://...` Vercel or custom domain, without a trailing slash.
-5. Check that the Venmo profile link is correct. New requests appear as **Awaiting payment** in the coach dashboard. Verify the payment in Venmo, then click **Mark Venmo paid** to confirm the lesson. Pending requests hold their time until confirmed or declined.
+5. Check that the Venmo profile link is correct. New requests appear as **Awaiting payment** in the coach dashboard. Verify the payment in Venmo, then click **Mark Venmo paid** to confirm the lesson. Pending requests hold their time until confirmed, declined by the coach, or cancelled by the parent before payment.
 6. Verify `/api/config`, `/book`, and `/admin` on the deployed domain. Submit a test request, verify it stays pending, then decline it from the coach dashboard to release the time.
 
 ### Required Vercel environment variables

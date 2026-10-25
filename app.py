@@ -218,6 +218,7 @@ class Handler(BaseHTTPRequestHandler):
                 data = dict(r); data["can_change"] = r["status"] == "confirmed" and parse_dt(r["start_at"]) > utc_now() + timedelta(hours=12)
                 data["payment_method"] = "stripe" if r["stripe_session_id"] else "venmo"
                 data["venmo_url"] = venmo_url() if data["payment_method"] == "venmo" and r["status"] == "pending" else ""
+                data["can_cancel_request"] = r["status"] == "pending" and data["payment_method"] == "venmo"
                 data.pop("stripe_session_id", None)
                 return self.reply(200, data)
             if path.path == "/api/admin":
@@ -334,6 +335,11 @@ class Handler(BaseHTTPRequestHandler):
             c.execute("BEGIN IMMEDIATE")
             b = c.execute("SELECT b.*,l.minutes FROM bookings b JOIN lesson_types l ON l.id=b.lesson_type_id WHERE manage_token_hash=?", (hashlib.sha256(token.encode()).hexdigest(),)).fetchone()
             if not b: return self.reply(404, {"error": "Booking not found"})
+            if b["status"] == "pending" and not b["stripe_session_id"] and action == "cancel":
+                c.execute("UPDATE bookings SET status='cancelled' WHERE id=?", (b["id"],))
+                c.execute("UPDATE payments SET status='cancelled' WHERE booking_id=?", (b["id"],))
+                c.commit()
+                return self.reply(200, {"ok": True})
             if b["status"] != "confirmed" or parse_dt(b["start_at"]) <= utc_now() + timedelta(hours=12): return self.reply(403, {"error": "Online changes close 12 hours before your lesson. Please contact Coach Dacia directly."})
             if action == "cancel": c.execute("UPDATE bookings SET status='cancelled' WHERE id=?", (b["id"],))
             elif action == "reschedule":

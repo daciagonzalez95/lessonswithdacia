@@ -55,6 +55,13 @@ class BookingFlowTest(unittest.TestCase):
             with self.booking_app.db() as connection:
                 self.assertEqual(connection.execute("SELECT status FROM bookings WHERE id=?", (booking_id,)).fetchone()[0], "confirmed")
                 self.assertEqual(connection.execute("SELECT status FROM payments WHERE booking_id=?", (booking_id,)).fetchone()[0], "paid")
+            next_slot = next(s for s in self.client.get("/api/slots?date=" + day).json["slots"] if s["label"] == "10:30 AM")
+            second = self.client.post("/api/checkout", json={**details, "start_at": next_slot["start_at"]}).json
+            second_token = second["manage_url"].split("token=", 1)[1]
+            self.assertTrue(self.client.get("/api/manage?token=" + second_token).json["can_cancel_request"])
+            self.assertEqual(self.client.post("/api/manage/change", json={"token": second_token, "action": "cancel"}).status_code, 200)
+            self.assertEqual(self.client.get("/api/manage?token=" + second_token).json["status"], "cancelled")
+            self.assertIn(next_slot["start_at"], [s["start_at"] for s in self.client.get("/api/slots?date=" + day).json["slots"]])
 
     def test_payment_and_parent_changes(self):
         app = self.booking_app
