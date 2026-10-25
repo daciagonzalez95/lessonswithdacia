@@ -1,6 +1,8 @@
 """Database connection shared by local SQLite and hosted Supabase Postgres."""
 import os
+import re
 import sqlite3
+import urllib.parse
 from pathlib import Path
 
 
@@ -29,19 +31,54 @@ class Result:
         return (Row(value) for value in self.cursor)
 
 
+def normalize_database_url(url):
+    """Remove the brackets left around a substituted Supabase password."""
+    if not url.startswith(("postgres://", "postgresql://")) or "@" not in url:
+        return url
+    prefix, host_and_path = url.rsplit("@", 1)
+    if ":" not in prefix:
+        return url
+    user_prefix, password = prefix.rsplit(":", 1)
+    if password.startswith("[") and password.endswith("]"):
+        return user_prefix + ":" + password[1:-1] + "@" + host_and_path
+    return url
+
+
 class PostgresConnection:
     def __init__(self, url):
         import psycopg
         from psycopg.rows import dict_row
 
-        self.connection = psycopg.connect(
-            url,
-            autocommit=True,
-            prepare_threshold=None,
-            row_factory=dict_row,
-            connect_timeout=10,
-            sslmode="require",
-        )
+        uri = urllib.parse.urlsplit(normalize_database_url(url))
+        if uri.scheme not in ("postgres", "postgresql") or not uri.hostname or not uri.username or not uri.password:
+            raise ValueError("DATABASE_URL must be a complete PostgreSQL connection URI")
+        try:
+            passwords = [urllib.parse.unquote(uri.password, errors="strict")]
+        except UnicodeDecodeError:
+            # Keep malformed %XX sequences literal while decoding valid ASCII escapes.
+            partial = re.sub(r"%([0-7][0-9a-fA-F])", lambda match: chr(int(match.group(1), 16)), uri.password)
+            passwords = [partial, uri.password] if partial != uri.password else [uri.password]
+        for password in passwords:
+            try:
+                self.connection = psycopg.connect(
+                    host=uri.hostname,
+                    port=uri.port or 5432,
+                    dbname=uri.path.lstrip("/") or "postgres",
+                    user=urllib.parse.unquote(uri.username),
+                    password=password,
+                    autocommit=True,
+                    prepare_threshold=None,
+                    row_factory=dict_row,
+                    connect_timeout=10,
+                    sslmode="require",
+                )
+                break
+            except psycopg.OperationalError as error:
+                if password != passwords[-1] and "password authentication failed" in str(error):
+                    continue
+                if "password authentication failed" in str(error):
+                    raise ValueError("Supabase rejected the database password in DATABASE_URL") from None
+                raise ValueError("Could not connect to the Supabase database") from None
         self.in_transaction = False
 
     def __enter__(self):
