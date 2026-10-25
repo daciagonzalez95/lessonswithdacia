@@ -1,4 +1,10 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "framework": "flask"
+  "framework": "flask",
+  "rewrites": [
+    { "source": "/book", "destination": "/index.html" },
+    { "source": "/admin", "destination": "/index.html" },
+    { "source": "/manage", "destination": "/index.html" },
+    { "source": "/success", "destination": "/index.html" }
+  ]
 }
