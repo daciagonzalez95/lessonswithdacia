@@ -19,6 +19,7 @@ class BookingFlowTest(unittest.TestCase):
             "STRIPE_SECRET_KEY": "sk_test_placeholder",
             "STRIPE_WEBHOOK_SECRET": "whsec_test_placeholder",
             "PUBLIC_BASE_URL": "http://localhost",
+            "ALLOW_LOCAL_FLASK_SQLITE": "1",
         })
         self.environment.start()
         import app as booking_app

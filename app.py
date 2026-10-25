@@ -401,7 +401,7 @@ else:
     @app.route("/", defaults={"path": ""}, methods=["GET", "POST"])
     @app.route("/<path:path>", methods=["GET", "POST"])
     def vercel_route(path):
-        if os.environ.get("VERCEL") and not os.environ.get("DATABASE_URL"):
+        if not os.environ.get("DATABASE_URL") and os.environ.get("ALLOW_LOCAL_FLASK_SQLITE") != "1":
             return Response("Database is not configured", status=503)
         handler = FlaskHandler()
         if request.method == "POST":
